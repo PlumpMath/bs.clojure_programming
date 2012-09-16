@@ -101,38 +101,48 @@
 
 ;;;; MetaData
 
+(meta ^:private [1 2 3])
+;; {:private true}
+(meta ^:private ^:dynamic [1 2 3])
+;; {:dynamic true, :private true}
+
 (def a
   ^{:created (System/currentTimeMillis)}
   [1 2 3])
 (meta a)
 ;; {:created 1347290765294}
 
-;; (let [millis (System/currentTimeMillis)]
-;;   (java.util.concurrent.TimeUnit/MILLISECONDS millis))
+(def b (with-meta a (assoc (meta a)
+                      :modified (System/currentTimeMillis))))
+(meta b)
+;; {:modified 1347761532079, :created 1347761526881}
 
+(def c (vary-meta a assoc :modified (System/currentTimeMillis)))
+(meta c)
+;; {:modified 1347761612033, :created 1347761526881}
 
 ;;;; Thinking Different
+;;; Revisiting a classic: Consway's Game of Life
 
 (defn empty-board
+  ;; (empty-board 2 3)
+  ;; [[nil nil] [nil nil] [nil nil]]
   [w h]
-  (vec (repeat w (vec (repeat h nil)))))
+  (vec (repeat h (vec (repeat w nil)))))
 
-(empty-board 10 20)
 
 (defn populate
+  ;; (populate (empty-board 2 3) #{[0 1]})
+  ;; [[nil :on] [nil nil] [nil nil]]
   [board living-cells]
   (reduce (fn [board coords]
             (assoc-in board coords :on))
           board
           living-cells))
 
-(def glider
-  (populate (empty-board 6 6)
-            #{[2 0] [2 1] [2 2] [1 2] [0 1]}))
-
-(pprint glider)
-
 (defn neighbours
+  ;; (neighbours [0 0])
+  ;; ([-1 -1] [-1 0] [-1 1] [0 -1] [0 1] [1 -1] [1 0] [1 1])
   [[x y]]
   (for [dx [-1 0 1]
         dy [-1 0 1]
@@ -143,13 +153,17 @@
   [board loc]
   (count (filter #(get-in board %) (neighbours loc))))
 
+(count-neighours
+ (populate (empty-board 2 3) #{[0 0] [0 1] [1 1]})		       [0 0])
+;; 2
+
 (defn indexed-step
   [board]
-  (let [w (count board)
-        h (count (first board))]
+  (let [w (count (first board))
+        h (count board)]
     (loop [new-board board x 0 y 0]
-      (cond (>= x w) new-board
-            (>= y h) (recur new-board (inc x) 0)
+      (cond (>= y h) new-board
+            (>= x w) (recur new-board 0 (inc y))
             :else    (let [new-liveness
                            (case (count-neighours board [x y])
                              2 (get-in board [x y])
@@ -157,8 +171,14 @@
                              nil)]
                        (recur (assoc-in new-board [x y]
                                         new-liveness)
-                              x
-                              (inc y)))))))
+                              (inc x)
+                              y))))))
+
+(def glider
+  (populate (empty-board 6 6)
+            #{[2 0] [2 1] [2 2] [1 2] [0 1]}))
+
+(pprint glider)
 
 (-> (iterate indexed-step glider)
     (nth 1)
@@ -268,3 +288,55 @@
 
 (frequencies [1 2 2 2 2 3])
 ;; {1 1, 2 4, 3 1}
+
+;;; Maze generation
+;; http://weblog.jamisbuck.org/2011/2/7/maze-generation-algorithm-recap
+(defn maze
+  [walls]
+  (let [paths (reduce (fn [index [a b]]
+                        (merge-with into index {a [b] b [a]}))
+                      {}
+                      (map seq walls))
+        start-loc (rand-nth (keys paths))]
+    (loop [walls walls
+           unvisited (disj (set (keys paths)) start-loc)]
+      (if-let [loc (when-let [s (seq unvisited)]
+                     (rand-nth s))]
+        (let [walk (iterate (comp rand-nth paths) loc)
+              steps (zipmap (take-while unvisited walk) (next walk))]
+          (recur (reduce disj walls (map set steps))
+                 (reduce disj unvisited (keys steps))))
+        walls))))
+
+(defn grid
+  [w h]
+  (set (concat
+        (for [i (range (dec w))
+              j (range h)]
+          #{[i j] [(inc i) j]})
+        (for [i (range w)
+              j (range (dec h))]
+          #{[i j] [i (inc j)]}))))
+
+(defn draw
+  [h w maze]
+  (doto (javax.swing.JFrame. "Maze")
+    (.setContentPane
+     (doto (proxy [javax.swing.JPanel] []
+             (paintComponent [^java.awt.Graphics g]
+               (let [g (doto ^java.awt.Graphics2D (.create g)
+                             (.scale 10 10)
+                             (.translate 1.5 1.5)
+                             (.setStroke (java.awt.BasicStroke. 0.4)))]
+                     (.drawRect g -1 -1 w h)
+                     (doseq [[[x1 y1] [x2 y2]] (map sort maze)]
+                       (let [[x y] (if (= x1 x2)
+                                       [(dec x1) y1]
+                                       [x1 (dec y1)])]
+                         (.drawLine g x1 y1 x y))))))
+       (.setPreferredSize (java.awt.Dimension.
+                           (* 10 (inc w)) (* 10 (inc h))))))
+    .pack
+    (.setVisible true)))
+
+(draw 40 40 (maze (grid 40 40)))
