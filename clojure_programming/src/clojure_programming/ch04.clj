@@ -597,4 +597,66 @@ tems] disj item))))
 (def something-var)
 (declare something-fn)
 
-;;; Agents
+;;; :TODO *** Agents - async & uncoord
+;; Actions(queued using 'send')
+;; - evaluated within a fixed-size thread pool
+;; - :TODO ??? don't I/O or other blocking op
+;; Actions(queued using 'send-off')
+;; - evaluated within an unbounded thread pool
+(def a (agent 500))
+(send a range 1000)
+
+(def a (agent 0))
+(send a inc)
+
+(def a (agent 5000))
+(def b (agent 10000))
+(send-off a #(Thread/sleep %))
+(send-off b #(Thread/sleep %))
+(await a b)
+
+;; Dealing with Errors in Agent Actions
+(def a (agent nil))
+(send a (fn [_]
+          (throw (Exception. "something is wrong"))))
+;; (send a identity) ; error: java.lang.RuntimeException: Agent is failed, needs restart
+(restart-agent a 42)
+(send a inc)
+(reduce send a (for [x (range 3)]
+                 (fn [_]
+                   (throw (Exception. (str "error #" x))))))
+(agent-error a)                         ; #<Exception java.lang.Exception: error #0>
+(restart-agent a 42)
+(agent-error a)                         ; #<Exception java.lang.Exception: error #1>
+(restart-agent a 42 :clear-actions true)
+(agent-error a)                         ; nil
+
+;; -------------------------
+;; clojure.core/agent-error
+;; ([a])
+;;   Returns the exception thrown during an asynchronous action of the
+;;   agent if the agent is failed.  Returns nil if the agent is not
+;;   failed.
+
+
+;; Agent error handler and modes
+(def a (agent nil :error-mode :continue))
+(send a (fn [_]
+          (throw (Exception. "something is wrong"))))
+(send a identity)
+
+(def a (agent nil
+              :error-mode :continue
+              :error-handler (fn [the-agent exception]
+                               (println (.getMessage exception)))))
+(send a (fn [_]
+          (throw (Exception. "something is wrong"))))
+(send a identity)
+
+(set-error-handler! a (fn [the-agent exception]
+                        (when (= "FATAL" (.getMessage exception))
+                          (set-error-mode! the-agent :fail))))
+(send a (fn [_]
+          (throw (Exception. "FATAL"))))
+;; (send a identity) ; Exception FATAL  ch04/eval1599/fn--1600 (NO_SOURCE_FILE:1)
+
