@@ -426,3 +426,175 @@ tems] disj item))))
 ;;  (ref-set x 1))
 ;; => error
 ;; @x => 0
+
+;;; Readers may retry
+;; enough minimum history to a good value.
+(ref-min-history (ref "abc" :min-history 3 :max-history 30))   ; => 3
+(ref-max-history (ref "abc" :min-history 3 :max-history 30))   ; => 30
+(ref-history-count (ref "abc" :min-history 3 :max-history 30)) ; => 0
+;; --
+(def a (ref 0))
+(future (dotimes [_ 500]
+          (dosync (Thread/sleep 200)
+                  (alter a inc))))
+@(future (dosync (Thread/sleep 1000) @a))
+(ref-history-count a)
+;; --
+(def a (ref 0 :max-history 100))
+(future (dotimes [_ 500]
+          (dosync (Thread/sleep 20)
+                  (alter a inc))))
+@(future (dosync (Thread/sleep 1000) @a))
+(ref-history-count a)
+;; --
+(def a (ref 0 :min-history 50 :max-history 100))
+(future (dotimes [_ 500]
+          (dosync (Thread/sleep 20)
+                  (alter a inc))))
+@(future (dosync (Thread/sleep 1000) @a))
+(ref-history-count a)
+
+
+;;; Write skew
+;; :more http://en.wikipedia.org/wiki/Snapshot_isolation
+(def daylight (ref 1))
+(defn attack
+  [aggressor target]
+  (dosync
+;;   (let [damage (* (rand 0.1) (:strength @aggressor) @daylight)] ; skey
+   (let [damage (* (rand 0.1) (:strength @aggressor) (ensure daylight))] ; daylight will not change before the reading transaction commits success.
+     (commute target update-in [:health] #(max 0 (- % damage))))))
+
+;;; Vars
+;; ch04> map
+;; #<core$map clojure.core$map@4e5acdf>
+;; ch04> #'map
+;; #'clojure.core/map
+;; ch04> @#'map
+;; #<core$map clojure.core$map@4e5acdf>
+;; ch04> `~map
+;; #<core$map clojure.core$map@4e5acdf>
+(def ^:private everything 42)
+(def ^{:private true} evrything 42)
+(ns other-namespace)
+(refer 'ch04)
+;; everything         => error: Unable to resolve symbol
+;; ch04/everything    => error: is not public
+;; @#'ch04/everything => 42
+
+(def a
+  "A sample value"
+  5)
+(defn b
+  "A simple calculation using `a`."
+  [c]
+  (+ a c))
+
+(doc a)
+(doc b)
+(meta #'a)
+(meta #'b)
+
+;; ^:const - value captured by function at compile-time.
+(def ^:const max-value 255)
+(defn valid-value?
+  [v]
+  (<= v max-value))
+(valid-value? 299)                      ; flase
+(def max-value 500)
+(valid-value? 299)                      ; flase
+
+;; Dynamic Scope
+(def ^:dynamic *max-value* 255)
+(defn valid-value?
+  [v]
+  (<= v *max-value*))
+(binding [*max-value* 500]
+  ;; binding(Macro): The new bindings are made in parallel (unlike let)
+  (println (valid-value? 299))
+  (doto (Thread. #(println "in other thread: " (valid-value? 299)))
+    .start
+    .join))
+
+;; Expaneded
+;; (let* []
+;;       (clojure.core/push-thread-bindings
+;;        (clojure.core/hash-map (var *max-value*) 500))
+;;       (try
+;;         (println (valid-value? 299))
+;;         (doto (Thread. (fn* [] (println "in other thread: " (valid-value? 299))))
+;;           .start
+;;           .join)
+;;         (finally
+;;           (clojure.core/pop-thread-bindings))))
+
+(def ^:dynamic *var* :root)
+(defn get-*var* [] *var*)
+(let [*var* :a]
+  (println "*var*      : " *var*)        ; :a
+  (println "(get-*var*): " (get-*var*))) ; :root
+
+(binding [*var* :a]
+  (println "*var*      : " *var*)        ; :a
+  (println "(get-*var*): " (get-*var*))) ; :a
+
+(defn http-get
+  [url-string]
+  (let [conn (-> url-string java.net.URL. .openConnection)
+        response-code (.getResponseCode conn)]
+    (if (== 404 response-code)
+      [response-code]
+      [response-code (-> conn .getInputStream slurp)])))
+
+(http-get "http://google.com/bad-url")
+(http-get "http://google.com/")
+
+
+(def ^:dynamic *response-code* nil)
+(defn http-get
+  [url-string]
+  (let [conn (-> url-string java.net.URL. .openConnection)
+        response-code (.getResponseCode conn)]
+    (when (thread-bound? #'*response-code*)
+      (set! *response-code* response-code))
+    (when (not= 404 response-code)
+      (-> conn .getInputStream slurp))))
+    ;; (if (== 404 response-code)
+    ;;   [response-code]
+    ;;   [response-code (-> conn .getInputStream slurp)])))
+
+(http-get "http://google.com")
+(do
+  (binding [*response-code* nil]
+    (let [content (http-get "http://google.com/bad-url")]
+      (println "Response code was: " *response-code*)))
+  *response-code*)
+
+;; Dynamic scope propagates through Clojure-native concurrency forms.
+(binding [*max-value* 500]
+  (println (valid-value? 299))
+  @(future (valid-value? 299)))
+
+(binding [*max-value* 500]
+  (map valid-value? [299]))             ; (false)
+(binding [*max-value* 500]
+  (pmap valid-value? [299]))            ; (true)
+(map #(binding [*max-value* 500]
+        (valid-value? %)) [299])        ; (true)
+
+
+;; Changing a var's Root Binding.
+(def x 0)
+(alter-var-root #'x inc)                ; x => 1
+;; (alter-var-root x inc) ; error: java.lang.ClassCastException: java.lang.Long cannot be cast to clojure.lang.Var
+
+(do
+  (with-redefs [*max-value* 500]
+    (println *max-value*))              ; 500
+  (println *max-value*))                ; 255
+
+;; Forward Declarations
+(def something-var)
+(declare something-fn)
+
+;;; Agents
