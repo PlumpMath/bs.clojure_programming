@@ -660,3 +660,75 @@ tems] disj item))))
           (throw (Exception. "FATAL"))))
 ;; (send a identity) ; Exception FATAL  ch04/eval1599/fn--1600 (NO_SOURCE_FILE:1)
 
+;;
+;; Persisting reference states with an agent-based write-behind log
+;;
+(require '[clojure.java.io :as io])
+
+(def console (agent *out*))
+(def character-log
+  (agent (io/writer "character-states.log" :append true)))
+
+(defn write
+  [^java.io.Writer w & content]
+  (doseq [x (interpose " " content)]
+    (.write w (str x)))
+  (doto w
+    (.write "\n")
+    .flush))
+
+(defn log-referece
+  [reference & writer-agents]
+  (add-watch reference :log
+             (fn [_ reference old new]
+               (doseq [writer-agent writer-agents]
+                 (send-off writer-agent write new)))))
+
+(def smaug
+  (character "Smaug" :health 500 :strength 400))
+(def bilbo
+  (character "Bilbo" :health 100 :strength 100))
+(def gandalf
+  (character "Gandalf" :health 75 :mana 1000))
+
+(log-referece bilbo console character-log)
+(log-referece smaug console character-log)
+
+(wait-futures 1
+              (play bilbo attack smaug)
+              (play smaug attack bilbo)
+              (play gandalf heal bilbo))
+
+(defn attack
+  [aggressor target]
+  (dosync
+   (let [damage (* (rand 0.1)
+                   (:strength @aggressor)
+                   (ensure daylight))]
+     (send-off console write
+               (:name @aggressor) "hits" (:name @target) "for" damage)
+     (commute target update-in [:health] #(max 0 (- % damage))))))
+
+(defn heal
+  [healer target]
+  (dosync
+   (let [aid (min (* (rand 0.1) (:mana @healer))
+                  (- (:max-health @target) (:health @target)))]
+     (when (pos? aid)
+       (send-off console write
+                 (:name @healer) "heals" (:name @target) "for" aid)
+       (commute healer update-in [:mana] - (max 5 (/ aid 5)))
+       (alter target update-in [:health] + aid)))))
+
+(dosync
+ (alter smaug assoc :healthth 500)
+ (alter bilbo assoc :health 100))
+
+(wait-futures 1
+              (play bilbo attack smaug)
+              (play smaug attack bilbo)
+              (play gandalf heal bilbo))
+
+;;
+;; Using agents to parallelize workloads
+;;
