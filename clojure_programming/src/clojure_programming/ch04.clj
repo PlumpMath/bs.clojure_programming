@@ -735,3 +735,49 @@ tems] disj item))))
 ;; https://github.com/cgrand/enlive/wiki
 ;; If you use Leiningen, add [enlive "1.0.0"] to your project.clj dependencies. (This won’t work with Clojure 1.0.)
 (require '[net.cgrand.enlive-html :as enlive])
+(use '[clojure.string :only (lower-case)])
+(import '(java.net URL MalformedURLException))
+
+(defn- links-from
+  [base-url html]
+  (remove nil? (for [link (enlive/select html [:a])]
+                 (when-let [href (-> link :attrs :href)]
+                   (try
+                     (URL. base-url href)
+                     (catch MalformedURLException e))))))
+
+(defn- words-from
+  [html]
+  (let [chunks (-> html
+                   (enlive/at [:script] nil)
+                   (enlive/select [:body enlive/text-node]))]
+    (->> chunk
+         (mapcat (partial re-seq #"\w+"))
+         (remove (partial re-matches #"\d+"))
+         (map lower-case))))
+
+(def url-queue (java.util.concurrent.LinkedBlockingQueue.))
+(def crawled-urls (atom #{}))
+(def word-freqs (atom {}))
+
+(declare get-url)
+(def agents
+  (set (repeatedly 25
+                   #(agent {::t #'get-url :queue url-queue}))))
+
+(declare run process handle-results)
+
+(defn ^::blocking get-url
+  [{:keys [^java.util.concurrent.BlockingQueue queue] :as state}]
+  (let [url (clojure.java.io/as-url (.take queue))]
+    (try
+      (if (@crawled-urls url)
+        state
+        {:url url
+         :contents (slurp url)
+         ::t #'process})
+      (catch Exception e
+        state)
+      (finally (run *agent*)))))
+
+;; :TODO rest in peace
