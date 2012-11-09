@@ -732,3 +732,6 @@ tems] disj item))))
 ;;
 ;; Using agents to parallelize workloads
 ;;
+;; https://github.com/cgrand/enlive/wiki
+;; If you use Leiningen, add [enlive "1.0.0"] to your project.clj dependencies. (This won’t work with Clojure 1.0.)
+(require '[net.cgrand.enlive-html :as enlive])
