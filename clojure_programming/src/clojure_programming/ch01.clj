@@ -56,5 +56,7 @@
 ;; 2. map, reduce, for와 같이 collection이나 sequence를 처리할 때.
 
 
-
-
+(class #"(\d+)-(\d+)")
+(re-seq #"(\d+)-(\d+)" "1-3")
+(= [1 2 3] [1, 2, 3])
+(= {:a 1 :b 2} {:a 1, :b 2})
