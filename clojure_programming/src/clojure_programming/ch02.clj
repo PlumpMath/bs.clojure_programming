@@ -81,6 +81,3 @@
 ;; (5 6 8 2 7 7 4 5 6 5)
 (repeatedly 10 (partial (memoize rand-int) 10))
 ;; (6 6 6 6 6 6 6 6 6 6)
-
-
-
