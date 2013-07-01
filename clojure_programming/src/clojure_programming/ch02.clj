@@ -1,28 +1,6 @@
 (ns ch02)
 
-;;; ch02. Functional Programming
-
-;;;; partial VS function literals
-(#(map * %1 %2 %3) [1 2 3] [4 5 6] [7 8 9])
-;; (28 80 162)
-
-(#(apply map * %&)  [1 2 3] [4 5 6] [7 8 9])
-;; (28 80 162)
-
-((partial map *)  [1 2 3] [4 5 6] [7 8 9])
-;; (28 80 162)
-
-;;;; Composition of Fuctions
-((comp str +) 1 2 3 4)
-;; "10"
-
-(-> 3
-    (/ 2))
-;; 3/2
-
-(->> 3
-     (/ 2))f
-;; 2/3
+(def camel->key
 
 ;;;; Building a Priitive Logging System with Composable Higher-Order Functions
 
@@ -74,10 +52,3 @@
                        (file-logger "messages.log"))))
 
 (log-timestamped "goodbye, now")
-
-
-;;;; Pure Functions
-(repeatedly 10 (partial rand-int 10))
-;; (5 6 8 2 7 7 4 5 6 5)
-(repeatedly 10 (partial (memoize rand-int) 10))
-;; (6 6 6 6 6 6 6 6 6 6)
