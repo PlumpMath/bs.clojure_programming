@@ -1,5 +1,6 @@
 ch01. Down the Rabbit Hole
 =====================
+
 # Down the Rabbit Hole (토끼굴로 내려가다)
 
 * 왜 클로져인가?
@@ -13,18 +14,12 @@ ch01. Down the Rabbit Hole
  -  코드가 데이터이고, 데이터가 코드이다.
  - AST로 변환되는 문법을 정의하는대신, AST를 표현하는 자료구조를 가지고 프로그램을 작성한다.
 
-```clojure
-;>> 화면에 출력된 내용을 표시한다.
-;<< 키보드로 입력한 내용을 표시한다.
-;=> 함수의 반환값을 표시한다.
-;-> 출력된 에러 메시지를 표시한다.
-```
-
+## 클래스
 ```clojure
 (class \c) ;=> java.lang.Character
 ```
 
-* keyword
+## 키워드
 
 ```clojure
 :a  ;=> :a
@@ -36,7 +31,7 @@ ch01. Down the Rabbit Hole
 (namespace :ch01/a) ;=> "ch01"
 ```
 
-* number
+## 숫자
 
 ```clojure
 42    ;=> 42
@@ -49,28 +44,31 @@ ch01. Down the Rabbit Hole
 22/7  ;=> 22/7  ;; clojure.lang.Ratio
 ```
 
-* Regular expression
+## 정규표현식
 
 ```clojure
 (class #"(\d+)-(\d+)")        ;=> java.util.regex.Pattern
 (re-seq #"(\d+)-(\d+)" "1-3") ;=> (["1-3" "1" "3"])
 ```
 
-* Comment
+## 주석
+
 ```clojure
 ; 한줄 짜리 주석.
 #_(* 2 2) ; 다른 표혁식 내에서도 주석으로 취급(#_ 리더메크로)
 (comment "hello world") ; 항상 반환값은 nil
 ```
 
-* whitespace and Comma
+## 구분자
 
 ```clojure
 (= [1 2 3] [1, 2, 3])        ;=> true
 (= {:a 1 :b 2} {:a 1, :b 2}) ;=> true
 ```
 
-# Destructuring
+## Destructuring
+
+* seq destructuring
 
 ```clojure
 (def v [1 2 3])
@@ -80,16 +78,10 @@ ch01. Down the Rabbit Hole
   (prn z))             ;>> [1 2 3]
 ```
 
-* Map destructuring
+* map destructuring
 
 ``` clojure
-(def m {:a 5
-        :b 6
-        :c [7 8 9]
-        :d {:e 10
-            :f 11}
-        "foo" 88
-        42 false})
+(def m {:a 5, :b 6, :c [7 8 9], :d {:e 10, :f 11}, "foo" 88, 42 false})
 
 (let [{x :a                             ; x => :a 5
        y :??                            ; y => :?? ?
@@ -106,7 +98,7 @@ ch01. Down the Rabbit Hole
 ;=> ["pyoung" 28]
 ```
 
-# loop and recur
+## loop and recur
 * recur이 필요없을 경우.
  1. doseq와 dotimes와 같은 상위 레벨 looping을 이용하여 처리할 수 있을 경우.
  2. map, reduce, for와 같이 collection이나 sequence를 처리할 때.
