@@ -33,3 +33,17 @@
                        (file-logger "messages.log")))
 (log "hello again")
 (slurp "messages.log") ;=> "hello\nhello again\n"
+
+;; ---
+(defn timestamped-logger
+  [logger]
+  (fn [msg] (logger (format "%1$tY-%1$tm-%1$te %1$tH:%1$tM:%1$tS"
+                            (java.util.Date.) msg))))
+
+(def log-timestamped
+  (timestamped-logger (multi-logger
+                       (print-logger *out*)
+                       (file-logger "messages.log"))))
+
+(log-timestamped "goodbye, now")
+(slurp "messages.log") ;=> "hello\nhello again\n2013-07-16 08:41:28\n"
