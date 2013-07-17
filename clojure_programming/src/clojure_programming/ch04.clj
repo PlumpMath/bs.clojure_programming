@@ -7,7 +7,7 @@
 (def d (delay (println "Running...")
               :done))
 
-(deref d)                              ; @d
+(deref d) ; same as @d
 
 (def a-fn #(do
              (println "Running...")
@@ -30,7 +30,12 @@
 (realized? (:content d))                ; true
 
 ;; Futures
-(def long-calculation (future (apply + (range 1e8))))
+(def long-calculation
+  (future
+    (let [x (apply + (range 1e8))]
+      (println "Done")
+      x)))
+
 
 @(future (Thread/sleep 5000) :done!)
 
