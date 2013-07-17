@@ -73,7 +73,8 @@
             board (for [x (range h) y (range w)]
                     [x y]))))
 
-;; free step
+;; ==========
+;; index free step
 (defn window
   ;; (window [nil :on nil])
   ;; => ((nil nil :on) (nil :on nil) (:on nil nil))
@@ -98,7 +99,7 @@
       3 :on
       nil)))
 
-(defn- step-row [rows-triple]
+(defn step-row [rows-triple]
   (vec (map liveness (cell-block rows-triple))))
 
 (defn index-free-step [board]
@@ -107,9 +108,9 @@
 ;; =========================================
 ;; test steps
 
-(def glider
-  (populate (empty-board 6 6)
-            #{[2 0] [2 1] [2 2] [1 2] [0 1]}))
+;; (def glider
+;;   (populate (empty-board 6 6)
+;;             #{[2 0] [2 1] [2 2] [1 2] [0 1]}))
 
 ;; (pprint glider)
 ;;>>

@@ -123,6 +123,47 @@ ch03. Collections and Data Structures
 ;=> {:modified 1347761612033, :created 1347761526881}
 ```
 
+## Clojure zip
+```clojure
+(require '[clojure.zip :as z])
+
+(def v [[1 2 [3 4]] [5 6]])
+
+(-> v z/vector-zip z/node)                ;=> [[1 2 [3 4]] [5 6]]
+(-> v z/vector-zip z/down z/node)         ;=> [1 2 [3 4]]
+(-> v z/vector-zip z/down z/right z/node) ;=> [5 6]
+(-> v z/vector-zip z/down z/right (z/replace 56) z/node) ;=> 56
+(-> v z/vector-zip z/down z/right (z/replace 56) z/root) ;=> [[1 2 [3 4]] 56]
+(-> v z/vector-zip z/down z/right z/remove z/node)       ;=> 4
+(-> v z/vector-zip z/down z/right z/remove z/root) ;=> [1 2 [3 4]]
+(-> v z/vector-zip z/down z/down z/right (z/edit * 42) z/root) ;=> [[1 84 [3 4]] [5 6]]
+
+;;; Custom zippers
+(defn html-zip [root]
+  (z/zipper vector?
+            (fn [[tagname & xs]]
+              (if (map? (first xs)) (next xs) xs))
+            (fn [[tagname & xs] children]
+              (into (if (map? (first xs)) [tagname (first xs)] [tagname])
+                    children))
+            root))
+
+(defn wrap
+  ([loc tag]
+     (z/edit loc #(vector tag %)))
+  ([loc tag attrs]
+     (z/edit loc #(vector tag attrs %))))
+
+(def h [:body [:h1 "Clojure"]
+        [:p "What a wonderful language!"]])
+
+(-> h html-zip z/down z/right z/down (wrap :b) z/root)
+;=> [:body [:h1 "Clojure"] [:p [:b "What a wonderful language!"]]]
+```
+
+## Game Of Life
+* http://en.wikipedia.org/wiki/Conway%27s_Game_of_Life
+
 # 참고자료
 * Stuart Halloway - Concurrent Programming with Clojure : http://vimeo.com/8672404
 * Persistent Trees in git, Clojure and CouchDB : http://eclipsesource.com/blogs/2009/12/13/persistent-trees-in-git-clojure-and-couchdb-data-structure-convergence/
