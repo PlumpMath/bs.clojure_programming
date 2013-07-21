@@ -1,5 +1,6 @@
-(ns game-of-life.core)
-(use 'clojure.pprint)
+(ns game-of-life.core
+  (:use clojure.pprint
+        quil.core))
 
 (defn empty-board  [w h]
   ;; (empty-board 2 3)
@@ -176,19 +177,12 @@
 
 ;; =====================
 ;; GUI
-(import '(java.awt Color Dimension)
-        '(javax.swing JPanel JFrame Timer)
-        '(java.awt.event ActionListener))
-
 (def glider-info #{[2 0] [2 1] [2 2] [1 2] [0 1]})
 (def lightweight-spaceship #{[0 1] [0 4]
                              [1 0]
                              [2 0] [2 4]
                              [3 0] [3 1] [3 2] [3 3]
                              })
-
-(defn adjust-pos [cells [dx dy]]
-  (set (map (fn [[x y]] [(+ x dx) (+ y dy)]) cells)))
 
 (def atom-cell (atom lightweight-spaceship))
 (def atom-cell (atom glider-info))
@@ -198,31 +192,26 @@
         x (if (< x 0) (+ x a-max) x)]
     x))
 
-(defn paint [^java.awt.Graphics g]
-  (. g setColor Color/RED)
+(defn draw-cells [cells]
+  ;; (println cells)
   (let [sz 10]
-    (swap! atom-cell step)
-    (doseq [[x y] @atom-cell]
-      (let [x (adjust1 x 30)
-            y (adjust1 y 30)]
-        (. g fillRect (* x sz) (* y sz) sz sz)))))
+    (doseq [[x y] (map (fn [[x y]] [(adjust1 x 30) (adjust1 y 30)]) cells)]
+      (rect (* x sz) (* y sz) sz sz))))
 
-(defn new-game-panel []
-  (proxy [JPanel ActionListener] []
-    (paintComponent [g]
-      (proxy-super paintComponent g)
-      (paint g))
-    (actionPerformed [e]
-      (.repaint this))))
+(defn draw-game-of-life []
+  (draw-cells (swap! atom-cell step)))
 
-(defn gui-game-of-life []
-  (let [frame (JFrame. "Game Of Life")
-        panel (new-game-panel)
-        timer (Timer. 75 panel)]
-    (. timer start)
-    (. panel setPreferredSize (Dimension. 350 350))
+(defn setup []
+  (smooth)
+  (frame-rate 20))
 
-    (doto frame
-      (.add panel)
-      (.pack)
-      (.setVisible true))))
+(defn draw []
+  (background 0)
+  (draw-game-of-life))
+
+(defsketch gui-game-of-life
+  :title "Game Of Life"
+  :setup setup
+  :draw draw
+  :size [300 400])
+
