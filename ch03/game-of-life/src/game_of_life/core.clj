@@ -184,9 +184,6 @@
                              [3 0] [3 1] [3 2] [3 3]
                              })
 
-(def atom-cell (atom lightweight-spaceship))
-(def atom-cell (atom glider-info))
-
 (defn adjust1 [x a-max]
   (let [x (rem x a-max)
         x (if (< x 0) (+ x a-max) x)]
@@ -198,16 +195,18 @@
     (doseq [[x y] (map (fn [[x y]] [(adjust1 x 30) (adjust1 y 30)]) cells)]
       (rect (* x sz) (* y sz) sz sz))))
 
-(defn draw-game-of-life []
-  (draw-cells (swap! atom-cell step)))
+(let [atom-cell (atom glider-info)]
+  (defn draw-glider []
+    (draw-cells (swap! atom-cell step))))
 
 (defn setup []
   (smooth)
   (frame-rate 20))
 
 (defn draw []
-  (background 0)
-  (draw-game-of-life))
+  (background 10 20 30)
+  (fill 0xff 0xff 0x00)
+  (draw-glider))
 
 (defsketch gui-game-of-life
   :title "Game Of Life"
