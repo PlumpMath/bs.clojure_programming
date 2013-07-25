@@ -154,14 +154,85 @@ long-calculation
 ```clojure
 (def x (ref 0))
 
+
 (deref x)                               ;=> 0
 (dosync (ref-set x 10))                 ;=> 10
 (dosync (alter x (constantly 20)))      ;=> 20
 ```
 
 ## agents (uncoordinated, asynchronous)
-```clojure
 
+1. 이 agent를 잘 이용하면, I/O나 다른 side-effect를 유발할 수 있는 함수들을 안전하게 처리할 수 있다.
+2. retrying하는 transaction에 안전하다.
+
+* send로 queue된 action들은, 현재 하드웨어의 병렬능력을 초과하지 않도록 설정된 고정된 크기의 쓰래드 풀에서 평가된다.
+* send-off로 queue된 action들은 제한이 없는 쓰래드풀에서 평가가 된다.
+
+
+```clojure
+(def a (agent 3)) ;=> #'user/a
+(deref a)         ;=> 3
+(send a range 10) ;=> #<Agent@5c69d74: 3>
+(deref a)         ;=> (3 4 5 6 7 8 9)
+
+(def a (agent 5000))                    ;=> #'user/a
+(def b (agent 10000))                   ;=> #'user/b
+(send-off a #(Thread/sleep %))          ;=> #<Agent@1e4f16a8: 5000>
+(send-off b #(Thread/sleep %))          ;=> #<Agent@11f741a: 10000>
+(await a b)                             ;=> nil
+(deref a)                               ;=> nil
+
+(def a (agent nil))     ;=> #'user/a
+(send a (fn [_]
+          (throw (Exception. "something is wrong"))))
+;=> #<Agent@1d0bc9e9 FAILED: nil>
+
+(restart-agent a 42)    ;=> 42
+(send a inc)            ;=> #<Agent@1d0bc9e9: 43>
+(reduce send a (for [x (range 3)]
+                 (fn [_] (throw (Exception. (str "error #" x))))))
+;=> #<Agent@1d0bc9e9: 43>
+(agent-error a)         ;=> #<Exception java.lang.Exception: error #0>
+
+(restart-agent a 42)    ;=> 42
+(agent-error a)         ;=> #<Exception java.lang.Exception: error #1>
+
+(restart-agent a 42 :clear-actions true) ;=> 42
+(agent-error a)                          ;=> nil
+```
+
+;; Agent error handler and modes
+
+```
+(def a (agent nil :error-mode :continue)) ;=> #'user/a
+
+(send a (fn [_] (throw (Exception. "something is wrong"))))
+;=> #<Agent@2c4a560d: nil>
+
+(send a identity)                         ;=> #<Agent@2c4a560d: nil>
+
+
+
+(def a (agent nil
+              :error-mode :continue
+              :error-handler (fn [the-agent exception]
+                               (println (.getMessage exception)))))
+;=> #'user/a
+
+(send a (fn [_] (throw (Exception. "something is wrong"))))
+;=> #<Agent@cf26f68: nil>
+;>> something is wrong
+
+(send a identity)                       ;=> #<Agent@cf26f68: nil>
+
+(set-error-handler! a (fn [the-agent exception]
+                        (when (= "FATAL" (.getMessage exception))
+                          (set-error-mode! the-agent :fail))))
+;=> nil
+
+
+(send a (fn [_] (throw (Exception. "FATAL")))) ;=> #<Agent@cf26f68: nil>
+(send a identity)                              ;-> Exception FATAL
 ```
 
 # Vars
@@ -250,5 +321,7 @@ everyting
  - io!매크로는 transaction상에서 수행되면 IllegalStateException을 발생함.
 * ref로 감싸는 값이 immutable이여야 안전함.
  - mutable일 경우, retry시 원하는 결과를 얻기 힘들지도 모름.
- 
 
+
+# Locking
+- 자바 배열 처럼, 클로저가 제공하는게 아닌 것에 락을 걸어야 할 경우, 몇몇 경우에 한해 locking 매크로가 도움이 될꺼임.
