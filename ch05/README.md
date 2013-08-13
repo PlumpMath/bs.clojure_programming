@@ -90,3 +90,6 @@ Macros
 ;>> (test-form 1 2 3)
 ;=> nil
 ```
+
+# Meta
+매크로에서 type-hint를 활용하기 위해서는, `with-meta`와 `(meta &form)`을 이용하여, 메타정보를 얻어와야한다.
